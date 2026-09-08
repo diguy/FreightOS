@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import type { FormEvent } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   AssistantRuntimeProvider,
@@ -14,14 +15,83 @@ import './App.css'
 const queryClient = new QueryClient()
 
 function App() {
+  const [user, setUser] = useState<User | null>(null)
+
   return (
     <QueryClientProvider client={queryClient}>
-      <CustomerWorkspace />
+      {user ? <CustomerWorkspace user={user} /> : <LoginView onLogin={setUser} />}
     </QueryClientProvider>
   )
 }
 
-function CustomerWorkspace() {
+type User = {
+  user_id: string
+  name: string
+  phone_masked: string
+}
+
+function LoginView({ onLogin }: { onLogin: (user: User) => void }) {
+  const [phone, setPhone] = useState('13800000001')
+  const [code, setCode] = useState('')
+  const [hint, setHint] = useState('')
+  const [error, setError] = useState('')
+
+  async function requestCode() {
+    setError('')
+    const response = await fetch('/api/v1/auth/send-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone }),
+    })
+    const body = await response.json()
+    if (!response.ok || !body.success) {
+      setError(body.error?.message || '验证码发送失败')
+      return
+    }
+    setHint(`验证码已发送，演示验证码：${body.data.dev_code}`)
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError('')
+    const response = await fetch('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, code }),
+    })
+    const body = await response.json()
+    if (!response.ok || !body.success) {
+      setError(body.error?.message || '登录失败')
+      return
+    }
+    onLogin(body.data)
+  }
+
+  return (
+    <main className="login-shell">
+      <section className="login-panel">
+        <div className="brand login-brand">
+          <div className="brand-mark"><Box size={19} strokeWidth={2.4} /></div>
+          <div><strong>快达物流</strong><span>智能客服</span></div>
+        </div>
+        <p className="eyebrow">消费者服务</p>
+        <h1>登录智能客服</h1>
+        <form className="login-form" onSubmit={submit}>
+          <label>手机号<input value={phone} onChange={(event) => setPhone(event.target.value)} /></label>
+          <div className="code-field">
+            <label>验证码<input value={code} onChange={(event) => setCode(event.target.value)} /></label>
+            <button type="button" onClick={requestCode}>获取验证码</button>
+          </div>
+          {hint && <p className="login-hint">{hint}</p>}
+          {error && <p className="login-error">{error}</p>}
+          <button className="login-submit" type="submit">登录</button>
+        </form>
+      </section>
+    </main>
+  )
+}
+
+function CustomerWorkspace({ user }: { user: User }) {
   const [conversationKey, setConversationKey] = useState(0)
   const [sessionId] = useState(() => crypto.randomUUID())
   const difyConversationId = useRef<string | null>(null)
@@ -37,7 +107,7 @@ function CustomerWorkspace() {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'X-User-Id': 'demo-user-001',
+              'X-User-Id': user.user_id,
             },
             body: JSON.stringify({
               session_id: sessionId,
@@ -71,7 +141,7 @@ function CustomerWorkspace() {
         }
       },
     }),
-    [sessionId],
+    [sessionId, user.user_id],
   )
   const runtime = useLocalRuntime(apiAdapter)
   const shortcuts = useMemo(
@@ -113,8 +183,8 @@ function CustomerWorkspace() {
             <div className="sidebar-footer">
               <div className="secure-note"><ShieldCheck size={16} /><span>您的订单信息已受保护</span></div>
               <div className="user-card">
-                <div className="user-avatar">张</div>
-                <div><strong>张三</strong><span>138****0001</span></div>
+                <div className="user-avatar">{user.name.slice(0, 1)}</div>
+                <div><strong>{user.name}</strong><span>{user.phone_masked}</span></div>
               </div>
             </div>
           </aside>
@@ -132,7 +202,7 @@ function CustomerWorkspace() {
                 <ThreadPrimitive.Viewport className="thread-viewport">
                   <div className="welcome-block">
                     <div className="welcome-icon"><LifeBuoy size={22} /></div>
-                    <h2>您好，张三</h2>
+                    <h2>您好，{user.name}</h2>
                     <p>我可以帮您查询物流、办理地址修改和处理工单。</p>
                   </div>
                   <ThreadPrimitive.Messages
