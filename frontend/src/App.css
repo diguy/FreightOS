@@ -458,6 +458,29 @@ p {
   font-size: 11px;
 }
 
+.confirmation-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 26px 10px;
+  color: #667b95;
+  font-size: 11px;
+}
+
+.confirmation-actions button {
+  padding: 6px 10px;
+  border: 1px solid #cfe1fb;
+  border-radius: 5px;
+  color: #1769e0;
+  background: #fff;
+  font-size: 11px;
+}
+
+.confirmation-actions button:hover {
+  background: #edf4ff;
+}
+
 .composer {
   display: flex;
   align-items: center;

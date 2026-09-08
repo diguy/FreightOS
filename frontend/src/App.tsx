@@ -149,6 +149,7 @@ function LoginView({ onLogin }: { onLogin: (user: User) => void }) {
 
 function CustomerWorkspace({ user }: { user: User }) {
   const [conversationKey, setConversationKey] = useState(0)
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false)
   const [session, setSession] = useState<SavedSession>(
     () => readStoredSessions()[0] || createSession(),
   )
@@ -183,6 +184,7 @@ function CustomerWorkspace({ user }: { user: User }) {
           }
 
           difyConversationId.current = body.data.conversation_id || null
+          setAwaitingConfirmation(Boolean(body.data.context?.awaiting_confirmation))
           const currentSession = sessionRef.current
           const updatedSession: SavedSession = {
             ...currentSession,
@@ -248,6 +250,7 @@ function CustomerWorkspace({ user }: { user: User }) {
     sessionRef.current = nextSession
     difyConversationId.current = null
     setSession(nextSession)
+    setAwaitingConfirmation(false)
     setRecentSessions((sessions) => [nextSession, ...sessions])
     setConversationKey((key) => key + 1)
   }
@@ -256,6 +259,7 @@ function CustomerWorkspace({ user }: { user: User }) {
     sessionRef.current = nextSession
     difyConversationId.current = nextSession.difyConversationId
     setSession(nextSession)
+    setAwaitingConfirmation(false)
     setConversationKey((key) => key + 1)
   }
 
@@ -347,6 +351,17 @@ function CustomerWorkspace({ user }: { user: User }) {
                 </button>
               ))}
             </div>
+            {awaitingConfirmation && (
+              <div className="confirmation-actions" aria-label="提交确认操作">
+                <span>请确认是否提交本次申请</span>
+                <button type="button" onClick={() => runtime.thread.composer.setText('确认提交')}>
+                  确认提交
+                </button>
+                <button type="button" onClick={() => runtime.thread.composer.setText('取消')}>
+                  取消
+                </button>
+              </div>
+            )}
             <ComposerPrimitive.Root className="composer">
               <ComposerPrimitive.Input
                 className="composer-input"

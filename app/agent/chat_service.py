@@ -264,16 +264,68 @@ class ChatService:
                     )
                 return "已完成处理，但暂时无法整理出详细结果。"
             return str(tool_result.get("message") or tool_result)
-        if isinstance(response.get("answer"), str) and response["answer"].strip():
-            return response["answer"]
+        customer_answer = _extract_customer_answer(response.get("answer"))
+        if customer_answer and not _is_internal_summary(customer_answer):
+            return customer_answer
+        if context.effective_missing_slots:
+            return _format_missing_slots(context)
+        if context.awaiting_confirmation:
+            return "信息已完整，请确认是否提交。"
+        if customer_answer:
+            return customer_answer
         summary = context.context.get("summary", "")
         if isinstance(summary, str) and summary.strip():
             return summary
-        if context.effective_missing_slots:
-            return f"还需要提供：{', '.join(context.effective_missing_slots)}"
-        if context.awaiting_confirmation:
-            return "信息已完整，请确认是否提交。"
         return "我暂时无法处理这个请求，请稍后重试。"
+
+
+def _extract_customer_answer(raw_answer: Any) -> str | None:
+    """Unwrap backend/Dify JSON layers before showing an answer to customers."""
+
+    if not isinstance(raw_answer, str) or not raw_answer.strip():
+        return None
+
+    candidate = raw_answer.strip()
+    for _ in range(2):
+        try:
+            payload = json.loads(candidate)
+        except (TypeError, ValueError):
+            break
+        if not isinstance(payload, dict):
+            break
+        nested = payload.get("data")
+        if isinstance(nested, dict) and isinstance(nested.get("answer"), str):
+            candidate = nested["answer"].strip()
+            continue
+        if isinstance(payload.get("answer"), str):
+            candidate = payload["answer"].strip()
+            continue
+        break
+    return candidate or None
+
+
+def _is_internal_summary(answer: str) -> bool:
+    return answer.startswith("当前意图：") or answer.startswith("已填槽位：")
+
+
+def _format_missing_slots(context: EffectiveSessionContext) -> str:
+    labels = {
+        "order_id": "订单号",
+        "new_address": "新的收货地址",
+        "complaint_content": "投诉内容",
+        "contact": "联系方式",
+        "ticket_no": "工单号",
+        "content": "需要人工处理的问题",
+    }
+    missing = [
+        labels.get(slot, slot)
+        for slot in context.effective_missing_slots
+    ]
+    if context.effective_intent == "address_change":
+        return "好的，我可以帮您修改收货地址。请提供订单号和新的收货地址。"
+    if len(missing) == 1:
+        return f"为了继续处理，请提供{missing[0]}。"
+    return f"为了继续处理，请提供：{'、'.join(missing)}。"
 
 
 def _format_tracking_answer(data: dict[str, Any]) -> str:

@@ -156,6 +156,51 @@ def test_backend_wrapped_answer_output_is_supported():
     assert len(tools.calls) == 1
 
 
+def test_backend_wrapped_internal_answer_is_not_shown_as_json():
+    import json
+
+    payload = _payload(
+        intent="address_change",
+        order_id=None,
+        action="collect_info",
+    )
+    payload["missing_slots"] = ["order_id", "new_address"]
+    payload["should_call_tool"] = False
+    dify = FakeDifyClient(
+        [
+            {
+                "answer": json.dumps(
+                    {
+                        "success": True,
+                        "data": {
+                            "answer": "当前意图：address_change；已填槽位：无。",
+                            "intent_result": payload,
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                "conversation_id": "conv-address-clarify",
+                "result_json": json.dumps(payload, ensure_ascii=False),
+            }
+        ]
+    )
+    service = ChatService(
+        dify_client=dify,
+        session_manager=SessionManager(InMemorySessionStore()),
+        tool_executor=RecordingToolExecutor(),
+    )
+
+    result = service.handle_message(
+        session_id="session-address-clarify",
+        user_id="user-address-clarify",
+        message="我要修改收货地址",
+    )
+
+    assert result.answer == "好的，我可以帮您修改收货地址。请提供订单号和新的收货地址。"
+    assert "intent_result" not in result.answer
+    assert "missing_slots" not in result.answer
+
+
 def test_human_transfer_without_content_stays_pending():
     payload = _payload(intent="human_transfer", order_id=None, action="collect_info")
     payload["missing_slots"] = ["content"]
@@ -311,7 +356,7 @@ def test_agent_turn_answer_uses_context_summary_when_no_tool_runs():
         result_json=__import__("json").dumps(payload),
     )
 
-    assert "当前意图：human_transfer" in result.answer
+    assert result.answer == "为了继续处理，请提供需要人工处理的问题。"
     assert result.context.effective_missing_slots == ["content"]
 
 
