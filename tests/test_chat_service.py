@@ -1,6 +1,6 @@
 from app.agent.chat_service import ChatService
 from app.agent.in_memory_session_store import InMemorySessionStore
-from app.agent.intent_schema import IntentEntities
+from app.agent.intent_schema import IntentResult
 from app.agent.session_manager import SessionManager
 
 
@@ -68,6 +68,202 @@ def test_chat_service_parses_merges_and_executes_only_after_gate():
     assert result.context.should_call_tool is True
     assert len(tools.calls) == 1
     assert dify.calls[0]["conversation_id"] is None
+
+
+def test_chat_service_accepts_final_answer_without_executing_tool_again():
+    dify = FakeDifyClient(
+        [
+            {
+                "answer": __import__("json").dumps(
+                    {"final_answer": "订单目前正在运输中。"},
+                    ensure_ascii=False,
+                ),
+                "conversation_id": "conv-final-answer",
+            }
+        ]
+    )
+    tools = RecordingToolExecutor()
+    session_manager = SessionManager(InMemorySessionStore())
+    session_manager.process_turn(
+        session_id="session-final-answer",
+        user_message="查一下 ORD1001 到哪里了",
+        intent_result=IntentResult.model_validate(_payload()),
+        user_id="user-final-answer",
+    )
+    session_manager.record_tool_result(
+        "session-final-answer",
+        {"type": "tracking", "data": {"order_no": "ORD1001"}},
+    )
+    service = ChatService(
+        dify_client=dify,
+        session_manager=session_manager,
+        tool_executor=tools,
+    )
+
+    result = service.handle_message(
+        session_id="session-final-answer",
+        user_id="user-final-answer",
+        message="查一下 ORD1001 到哪里了",
+    )
+
+    assert result.answer == "订单目前正在运输中。"
+    assert result.intent_result.intent == "tracking_query"
+    assert result.tool_result["type"] == "tracking"
+    assert tools.calls == []
+
+
+def test_invalid_final_answer_uses_safe_tool_fallback():
+    dify = FakeDifyClient(
+        [
+            {
+                "answer": __import__("json").dumps(
+                    {"final_answer": '{"tool_result": "泄漏"}'},
+                    ensure_ascii=False,
+                ),
+                "conversation_id": "conv-invalid-final-answer",
+            }
+        ]
+    )
+    session_manager = SessionManager(InMemorySessionStore())
+    session_manager.process_turn(
+        session_id="session-invalid-final-answer",
+        user_message="查一下 ORD1001 到哪里了",
+        intent_result=IntentResult.model_validate(_payload()),
+        user_id="user-invalid-final-answer",
+    )
+    session_manager.record_tool_result(
+        "session-invalid-final-answer",
+        {
+            "type": "tracking",
+            "data": {
+                "order_no": "ORD1001",
+                "status": "in_transit",
+            },
+        },
+    )
+    service = ChatService(
+        dify_client=dify,
+        session_manager=session_manager,
+        tool_executor=RecordingToolExecutor(),
+    )
+
+    result = service.handle_message(
+        session_id="session-invalid-final-answer",
+        user_id="user-invalid-final-answer",
+        message="查一下 ORD1001 到哪里了",
+    )
+
+    assert "订单 ORD1001" in result.answer
+    assert "tool_result" not in result.answer
+
+
+def test_unknown_follow_up_after_completed_address_change_does_not_reuse_old_request():
+    first = _payload(
+        intent="address_change",
+        order_id="ORD1001",
+        action="confirm",
+    )
+    first["entities"]["new_address"] = "上海市浦东新区世纪大道100号"
+    dify = FakeDifyClient(
+        [
+            {
+                "answer": "已提交",
+                "conversation_id": "conv-completed-address",
+                "result_json": __import__("json").dumps(first),
+            },
+            {
+                "answer": "请说明您需要处理的具体问题。",
+                "conversation_id": "conv-completed-address",
+                "result_json": __import__(
+                    "json"
+                ).dumps(
+                    _payload(
+                        intent="unknown",
+                        order_id=None,
+                        action="clarify",
+                    )
+                ),
+            },
+        ]
+    )
+    tools = RecordingToolExecutor()
+    service = ChatService(
+        dify_client=dify,
+        session_manager=SessionManager(InMemorySessionStore()),
+        tool_executor=tools,
+    )
+
+    service.handle_message(
+        session_id="completed-address-chat",
+        user_id="user-1",
+        message="确认提交",
+    )
+    second = service.handle_message(
+        session_id="completed-address-chat",
+        user_id="user-1",
+        message="帮我处理一下",
+    )
+
+    assert second.context.effective_intent == "unknown"
+    assert second.context.should_call_tool is False
+    assert "ORD1001" not in second.answer
+    assert "上海市浦东新区世纪大道100号" not in second.answer
+    assert second.context.context["summary"] == "当前没有待处理的业务请求。"
+    assert len(tools.calls) == 1
+
+
+def test_unknown_follow_up_with_pending_address_change_still_requests_missing_slots():
+    first = _payload(
+        intent="address_change",
+        order_id=None,
+        action="collect_info",
+    )
+    first["missing_slots"] = ["order_id", "new_address"]
+    first["should_call_tool"] = False
+    dify = FakeDifyClient(
+        [
+            {
+                "answer": "请提供订单号和新的收货地址。",
+                "conversation_id": "conv-pending-address",
+                "result_json": __import__("json").dumps(first),
+            },
+            {
+                "answer": "为了继续修改收货地址，请提供订单号和新的收货地址。",
+                "conversation_id": "conv-pending-address",
+                "result_json": __import__(
+                    "json"
+                ).dumps(
+                    _payload(
+                        intent="unknown",
+                        order_id=None,
+                        action="clarify",
+                    )
+                ),
+            },
+        ]
+    )
+    service = ChatService(
+        dify_client=dify,
+        session_manager=SessionManager(InMemorySessionStore()),
+        tool_executor=RecordingToolExecutor(),
+    )
+
+    service.handle_message(
+        session_id="pending-address-chat",
+        user_id="user-1",
+        message="我要修改收货地址",
+    )
+    second = service.handle_message(
+        session_id="pending-address-chat",
+        user_id="user-1",
+        message="帮我处理一下",
+    )
+
+    assert second.context.effective_intent == "address_change"
+    assert second.context.effective_missing_slots == ["order_id", "new_address"]
+    assert second.context.should_call_tool is False
+    assert "订单号" in second.answer
+    assert "新的收货地址" in second.answer
 
 
 def test_invalid_dify_output_is_safe_and_does_not_call_tool():

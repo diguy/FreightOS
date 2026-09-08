@@ -1,0 +1,39 @@
+你是这个项目的新一轮开发助手。请继续处理：
+E:\PythonProject5\backend-lab
+
+请先读取并遵守：
+1. E:\PythonProject5\backend-lab\AGENTS.md
+2. E:\PythonProject5\backend-lab\deliverables\电商物流智能客服_项目进度与后续交付计划_验收交接版_2026-09-07.docx
+3. E:\PythonProject5\backend-lab\docs\production-operations.md
+4. E:\PythonProject5\backend-lab\docs\session-contract.md
+5. 当前 git status
+
+项目当前状态：
+- Python 全量测试：161 passed，存在 1 个 Starlette/httpx 弃用警告。
+- 真实 MySQL 和 Redis 已接入，当前 .env 使用 APP_DATABASE=mysql、SESSION_STORE=redis。
+- MySQL 业务库已经完成 SQLite 数据迁移，业务表为 users、orders、tracking_events、tickets。
+- RAGFlow 已作为知识库主检索后端，知识评测 5/5 通过。
+- 真实 Dify -> FastAPI -> SessionManager -> BusinessToolExecutor -> MySQL 链路已通过。
+- 当前不需要重新接入 RAGFlow，也不要修改 Dify DSL，除非我明确要求。
+
+开始工作前：
+1. 先运行 poetry run pytest tests -q。
+2. 检查 Docker 中 logistics-mysql 和 logistics-redis 是否运行。
+3. 调用 /health/dependencies，确认 MySQL 和 Redis 都是 ok。
+4. 检查当前 git status，不要回滚或覆盖已有用户修改。
+
+当前建议任务：
+1. 补齐 evaluation/results 中缺失的意图识别预测，使 50 条基础和对抗用例形成完整评测。
+2. 重新生成正式意图回归报告，分别报告 intent、entities、missing_slots、tool_gate 和 unsafe_tool_calls。
+3. 继续保持 Dify 只处理当前轮意图识别，Python 负责会话合并、确认门控、业务权限和数据持久化。
+4. 继续保持 MySQL 和 Redis 外部依赖可注入、可测试。
+5. 如修改 DSL，必须复制成新版本文件，保留原 YAML。
+
+工作规则：
+- 修改前先说明将修改哪些文件以及原因。
+- 先读相关代码和测试，再进行最小改动。
+- 先跑模块测试，再跑集成和全量测试。
+- 真实服务测试使用只读或独立测试用户、独立 session_id 和幂等请求号。
+- 不要把 API key、密码或完整 .env 内容写入回复、文档或日志。
+- 每次完成后说明：修改内容、测试命令和结果、剩余风险、下一步建议。
+

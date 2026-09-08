@@ -1,0 +1,580 @@
+app:
+  description: "端到端验证物流意图识别、Python 会话记忆和槽位合并链路"
+  icon: 🤖
+  icon_background: "#FFEAD5"
+  icon_type: emoji
+  mode: advanced-chat
+  name: 物流意图识别-v3-多轮端到端验证-意图评测修正版
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/deepseek:0.0.21@5873fe73395aeb49ba26035059eb4e0ec5af01bb66d0545b031f8917b12e8c29
+    version: null
+kind: app
+version: 0.7.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload: {}
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ""
+      voice: ""
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: start
+        targetType: llm
+      id: start-to-intent
+      selected: false
+      source: start
+      sourceHandle: source
+      target: intent_llm
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: llm
+        targetType: code
+      id: intent-to-validator
+      selected: false
+      source: intent_llm
+      sourceHandle: source
+      target: validator
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: code
+        targetType: http-request
+      id: validator-to-backend
+      selected: false
+      source: validator
+      sourceHandle: source
+      target: backend_http
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: http-request
+        targetType: answer
+      id: backend-to-result
+      selected: false
+      source: backend_http
+      sourceHandle: source
+      target: result_answer
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 用户输入
+        type: start
+        variables: []
+      height: 72
+      id: start
+      position:
+        x: -500
+        y: 200
+      positionAbsolute:
+        x: -500
+        y: 200
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        prompt_template:
+        - id: intent-prompt
+          role: system
+          text: |
+            你是物流客服的意图识别模块。
+
+            只根据用户当前消息识别，不使用历史消息猜测当前实体。
+            只输出一个严格 JSON 对象，不要输出 Markdown、解释或额外文字。
+
+            可选 intent：
+            tracking_query
+            knowledge_query
+            address_change
+            complaint
+            human_transfer
+            ticket_status
+            unknown
+
+            实体字段必须完整输出：
+            order_id、ticket_no、new_address、complaint_content、contact。
+            没有提取到的字段使用 null。
+
+            规则：
+            1. tracking_query 是查询具体订单的物流位置、进度、状态或最新节点。
+            2. knowledge_query 是运费、时效、禁寄品、签收规则等通用知识。
+            3. address_change 是修改、变更或纠正收货地址。
+            4. complaint 是明确投诉快递员、物流服务或运输问题。
+            5. human_transfer 是明确要求人工客服或人工介入。
+            6. ticket_status 是查询已有工单状态或进度。
+            7. 无法判断、只有问候、只有模糊动作或只有一个实体时使用 unknown。
+            8. 明确投诉优先于普通物流查询，明确转人工优先于普通咨询。
+            9. 如果同一条消息同时包含两个不同的业务诉求，例如物流知识问答和订单物流查询，必须使用 unknown，should_call_tool 必须为 false；可以提取消息中明确出现的实体，但不能选择其中一个诉求执行。
+            9.1. 如果消息明确包含“我要人工”“转人工”等人工诉求，即使同时说“先查一下订单”等其他诉求，也必须优先识别为 human_transfer；如果没有具体求助内容，missing_slots 必须包含 content，should_call_tool 必须为 false。
+            9.2. 明确出现工单号（T 开头）并询问“现在怎样”“什么状态”“处理到哪了”“进度”等时，识别为 ticket_status，不要识别为 unknown。
+            9.3. 如果用户明确查询订单或包裹，但只说“之前那个订单”“刚才那个订单”等历史指代，没有提供当前订单号，识别为 tracking_query，missing_slots 必须包含 order_id，should_call_tool 必须为 false；不得因为缺少订单号而改成 unknown。
+            10. 订单号通常是 ORD 加数字，输出时统一大写；不要把手机号、运单号或金额当成订单号。
+            11. ticket_no 通常以 T 开头，输出时统一大写。
+            12. 只提取当前消息中明确出现的实体。脱敏手机号必须原样保留，例如 138****0001 不得改写为 138**0001。
+            13. complaint_content 必须提取用户明确表达的投诉原因，不要把“帮我投诉”等动作词重复放入原因；例如“这个包裹还没到，帮我投诉”的 complaint_content 应为“这个包裹还没到”，“我要投诉快递员”的 complaint_content 应为“我要投诉快递员”。
+            14. complaint 只要求 complaint_content 和 contact；order_id 不是投诉的必要字段。
+            15. human_transfer 必须有具体求助内容。只有“帮我转人工”时 missing_slots 必须包含 content，should_call_tool 必须为 false；“请转人工客服，我的包裹有问题”这类有具体原因的请求才可以调用工具。
+            15.1. “地址问题”“联系方式”等泛化信息不属于具体求助内容；例如“我需要人工处理地址问题，联系方式 138****0001”仍须将 content 放入 missing_slots，并禁止调用工具。
+            16. confidence 必须是 0 到 1 之间的数字。
+            17. confidence 小于 0.70 时 should_call_tool 必须为 false。
+            18. 缺少当前意图必要字段时 should_call_tool 必须为 false。
+            19. action 只能是 query、collect_info、clarify、transfer、confirm、cancel 之一。
+            20. address_change 在信息不完整时 action 使用 collect_info；信息齐全但没有明确确认时 action 使用 confirm，should_call_tool 为 false；只有用户明确说“确认提交”等确认语句时 action 才使用 confirm 且 should_call_tool 才能为 true。
+            21. unknown 的 action 使用 clarify，should_call_tool 必须为 false。
+
+            输出格式：
+            {
+              "intent": "tracking_query",
+              "confidence": 0.95,
+              "entities": {
+                "order_id": "ORD1001",
+                "ticket_no": null,
+                "new_address": null,
+                "complaint_content": null,
+                "contact": null
+              },
+              "missing_slots": [],
+              "action": "query",
+              "should_call_tool": true
+            }
+
+            用户当前消息：
+            {{#sys.query#}}
+        selected: false
+        title: 生成意图 JSON
+        type: llm
+        vision:
+          enabled: false
+      height: 87
+      id: intent_llm
+      position:
+        x: -160
+        y: 200
+      positionAbsolute:
+        x: -160
+        y: 200
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        code: |
+          import json
+          import re
+
+          ALLOWED_INTENTS = {
+              "tracking_query",
+              "knowledge_query",
+              "address_change",
+              "complaint",
+              "human_transfer",
+              "ticket_status",
+              "unknown",
+          }
+          ALLOWED_ACTIONS = {
+              "query",
+              "collect_info",
+              "clarify",
+              "transfer",
+              "confirm",
+              "cancel",
+          }
+
+          def empty_entities():
+              return {
+                  "order_id": None,
+                  "ticket_no": None,
+                  "new_address": None,
+                  "complaint_content": None,
+                  "contact": None,
+              }
+
+          def safe_result(error=None):
+              return {
+                  "result_json": json.dumps({
+                      "intent": "unknown",
+                      "confidence": 0.0,
+                      "entities": empty_entities(),
+                      "missing_slots": [],
+                      "action": "clarify",
+                      "should_call_tool": False,
+                      "validation_error": error,
+                  }, ensure_ascii=False),
+                  "intent": "unknown",
+                  "confidence": 0.0,
+                  "action": "clarify",
+                  "should_call_tool": False,
+              }
+
+          def main(text: str, query: str) -> dict:
+              cleaned = re.sub(r"<think>.*?</think>\s*", "", text or "", flags=re.S).strip()
+              cleaned = re.sub(r"^```json\s*|\s*```$", "", cleaned, flags=re.I | re.S).strip()
+              try:
+                  payload = json.loads(cleaned)
+                  if not isinstance(payload, dict):
+                      return safe_result("payload_not_object")
+                  intent = payload.get("intent")
+                  confidence = float(payload.get("confidence", 0))
+                  entities = payload.get("entities")
+                  missing_slots = payload.get("missing_slots")
+                  action = payload.get("action")
+                  should_call_tool = payload.get("should_call_tool")
+                  if entities is None:
+                      entities = {}
+                  if missing_slots is None:
+                      missing_slots = []
+                  if not isinstance(entities, dict):
+                      return safe_result("entities_not_object")
+                  if not isinstance(missing_slots, list):
+                      return safe_result("missing_slots_not_array")
+                  if action not in ALLOWED_ACTIONS:
+                      return safe_result("invalid_action")
+                  if not isinstance(should_call_tool, bool):
+                      return safe_result("should_call_tool_not_boolean")
+                  if intent not in ALLOWED_INTENTS:
+                      return safe_result("invalid_intent")
+                  if not 0 <= confidence <= 1:
+                      return safe_result("invalid_confidence")
+                  required_slots_by_intent = {
+                      "tracking_query": ("order_id",),
+                      "knowledge_query": (),
+                      "address_change": ("order_id", "new_address"),
+                      "complaint": ("complaint_content", "contact"),
+                      "human_transfer": ("content",),
+                      "ticket_status": ("ticket_no",),
+                      "unknown": (),
+                  }
+                  missing_slots = [
+                      slot
+                      for slot in missing_slots
+                      if slot in required_slots_by_intent[intent]
+                  ]
+                  query_text = (query or "").strip()
+                  normalized_entities = empty_entities()
+                  for key in normalized_entities:
+                      normalized_entities[key] = entities.get(key)
+                  if (
+                      intent == "complaint"
+                      and normalized_entities["complaint_content"]
+                  ):
+                      normalized_entities["complaint_content"] = re.split(
+                          r"[，,]\s*(?:帮我|请帮我|我要)?投诉",
+                          normalized_entities["complaint_content"],
+                          maxsplit=1,
+                      )[0].strip()
+                  ticket_query_markers = (
+                      "现在怎样",
+                      "什么状态",
+                      "处理到哪",
+                      "处理进度",
+                      "进度",
+                  )
+                  ticket_match = re.search(
+                      r"(?<![A-Za-z0-9])T[A-Za-z0-9]{6,}(?![A-Za-z0-9])",
+                      query_text,
+                      flags=re.IGNORECASE,
+                  )
+                  if (
+                      intent == "unknown"
+                      and ticket_match
+                      and any(marker in query_text for marker in ticket_query_markers)
+                  ):
+                      intent = "ticket_status"
+                      confidence = max(confidence, 0.90)
+                      normalized_entities["ticket_no"] = ticket_match.group(0).upper()
+                      missing_slots = []
+                      action = "query"
+                      should_call_tool = True
+                  historical_order_markers = (
+                      "之前那个订单",
+                      "刚才那个订单",
+                      "之前的订单",
+                      "刚才的订单",
+                  )
+                  if (
+                      intent == "unknown"
+                      and "订单" in query_text
+                      and any(marker in query_text for marker in historical_order_markers)
+                  ):
+                      intent = "tracking_query"
+                      confidence = max(confidence, 0.70)
+                      if "order_id" not in missing_slots:
+                          missing_slots.append("order_id")
+                      action = "collect_info"
+                      should_call_tool = False
+                  if intent == "complaint" and not normalized_entities["complaint_content"]:
+                      if "complaint_content" not in missing_slots:
+                          missing_slots.append("complaint_content")
+                  if intent == "complaint" and not normalized_entities["contact"]:
+                      if "contact" not in missing_slots:
+                          missing_slots.append("contact")
+                  transfer_reason_markers = (
+                      "包裹",
+                      "订单",
+                      "物流",
+                      "投诉",
+                      "问题",
+                      "异常",
+                      "破损",
+                      "快递员",
+                  )
+                  vague_transfer_reason_markers = (
+                      "地址问题",
+                  )
+                  human_markers = ("人工", "人工客服")
+                  has_human_request = any(
+                      marker in query_text for marker in human_markers
+                  )
+                  if (
+                      has_human_request
+                      and ("先查" in query_text or "先处理" in query_text)
+                      and intent != "human_transfer"
+                  ):
+                      intent = "human_transfer"
+                      confidence = min(confidence, 0.69)
+                      action = "clarify"
+                      missing_slots = ["content"]
+                      should_call_tool = False
+                  transfer_only_phrases = (
+                      "帮我转人工",
+                      "转人工",
+                      "转人工客服",
+                      "我要人工",
+                      "人工客服",
+                  )
+                  if intent == "human_transfer":
+                      has_reason = any(
+                          marker in query_text
+                          for marker in transfer_reason_markers
+                      )
+                      has_vague_reason = any(
+                          marker in query_text
+                          for marker in vague_transfer_reason_markers
+                      )
+                      is_transfer_only = any(
+                          query_text == phrase
+                          for phrase in transfer_only_phrases
+                      )
+                      if is_transfer_only or not has_reason or has_vague_reason:
+                          if "content" not in missing_slots:
+                              missing_slots.append("content")
+                      else:
+                          missing_slots = [
+                              slot
+                              for slot in missing_slots
+                              if slot != "content"
+                          ]
+                  if intent == "address_change" and not normalized_entities["order_id"]:
+                      if "order_id" not in missing_slots:
+                          missing_slots.append("order_id")
+                  if intent == "address_change" and not normalized_entities["new_address"]:
+                      if "new_address" not in missing_slots:
+                          missing_slots.append("new_address")
+                  if intent == "tracking_query" and not normalized_entities["order_id"]:
+                      if "order_id" not in missing_slots:
+                          missing_slots.append("order_id")
+                  if intent == "ticket_status" and not normalized_entities["ticket_no"]:
+                      if "ticket_no" not in missing_slots:
+                          missing_slots.append("ticket_no")
+                  if intent == "unknown":
+                      missing_slots = []
+                      action = "clarify"
+                  if intent == "unknown" or confidence < 0.70 or missing_slots:
+                      should_call_tool = False
+                  confirmation_phrases = (
+                      "确认提交",
+                      "确定提交",
+                      "同意提交",
+                      "确认修改",
+                      "确定修改",
+                  )
+                  has_explicit_confirmation = any(
+                      phrase in query_text for phrase in confirmation_phrases
+                  )
+                  if intent == "address_change" and (
+                      action != "confirm" or not has_explicit_confirmation
+                  ):
+                      should_call_tool = False
+                  if intent == "human_transfer" and "content" in missing_slots:
+                      should_call_tool = False
+                  if intent == "unknown":
+                      action = "clarify"
+                  if intent == "address_change" and missing_slots:
+                      action = "collect_info"
+                  return {
+                      "intent": intent,
+                      "confidence": confidence,
+                      "action": action,
+                      "should_call_tool": should_call_tool,
+                      "result_json": json.dumps({
+                          "intent": intent,
+                          "confidence": confidence,
+                          "entities": normalized_entities,
+                          "missing_slots": missing_slots,
+                          "action": action,
+                          "should_call_tool": should_call_tool,
+                      }, ensure_ascii=False),
+                  }
+              except (TypeError, ValueError, json.JSONDecodeError):
+                  return safe_result("invalid_json")
+        code_language: python3
+        outputs:
+          action:
+            children: null
+            type: string
+          confidence:
+            children: null
+            type: number
+          intent:
+            children: null
+            type: string
+          result_json:
+            children: null
+            type: string
+          should_call_tool:
+            children: null
+            type: boolean
+        selected: false
+        title: 校验意图 JSON v3
+        type: code
+        variables:
+        - value_selector:
+          - intent_llm
+          - text
+          value_type: string
+          variable: text
+        - value_selector:
+          - sys
+          - query
+          value_type: string
+          variable: query
+      height: 80
+      id: validator
+      position:
+        x: 180
+        y: 200
+      positionAbsolute:
+        x: 180
+        y: 200
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - id: backend-json-body
+            key: ""
+            type: text
+            value: '{"session_id":"{{#sys.conversation_id#}}","message":"{{#sys.query#}}","result_json":"{{#validator.result_json#}}","dify_conversation_id":"{{#sys.conversation_id#}}"}'
+          type: json
+        desc: "将当前轮意图结果交给 Python SessionManager 做槽位合并和多轮记忆处理"
+        headers: "Content-Type: application/json\nX-User-Id: dify-e2e-test-user"
+        method: post
+        params: ""
+        retry_config:
+          max_retries: 1
+          retry_enabled: true
+          retry_interval: 100
+        selected: false
+        timeout:
+          max_connect_timeout: 10
+          max_read_timeout: 30
+          max_write_timeout: 30
+        title: 调用 Python 会话编排
+        type: http-request
+        url: http://host.docker.internal:8000/api/v1/agent/turn
+        variables: []
+      height: 138
+      id: backend_http
+      position:
+        x: 860
+        y: 120
+      positionAbsolute:
+        x: 860
+        y: 120
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        answer: '{{#backend_http.body#}}'
+        selected: false
+        title: 返回后端会话结果
+        type: answer
+        variables: []
+      height: 101
+      id: result_answer
+      position:
+        x: 1200
+        y: 120
+      positionAbsolute:
+        x: 1200
+        y: 120
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+  viewport:
+    x: -260
+    y: 80
+    zoom: 0.8
+  rag_pipeline_variables: []

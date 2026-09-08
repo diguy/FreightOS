@@ -81,9 +81,11 @@ class SessionManager:
             if state.dify_conversation_id is None:
                 state.dify_conversation_id = dify_conversation_id
 
+        self._reset_completed_turn(state)
         state.turn_no += 1
         state.updated_at = utc_now()
         state.expires_at = state.updated_at + timedelta(seconds=self.ttl_seconds)
+        state.last_tool_result = None
 
         turn = SessionTurn(
             turn_no=state.turn_no,
@@ -193,6 +195,51 @@ class SessionManager:
         """Read a defensive copy of the current session state."""
 
         return self.store.get(session_id)
+
+    def get_effective_context(
+        self,
+        session_id: str,
+    ) -> EffectiveSessionContext | None:
+        """Rebuild the latest orchestration context without another turn."""
+
+        state = self.store.get(session_id)
+        if state is None or not state.recent_turns:
+            return None
+        return self._build_context(
+            state,
+            state.recent_turns[-1].intent_result,
+        )
+
+    def record_tool_result(
+        self,
+        session_id: str,
+        tool_result: dict | None,
+    ) -> None:
+        """Persist the latest tool result for answer-stage fallback."""
+
+        state = self.store.get(session_id)
+        if state is None:
+            return
+        state.last_tool_result = tool_result
+        state.updated_at = utc_now()
+        self.store.save(state)
+
+    @staticmethod
+    def _reset_completed_turn(state: SessionState) -> None:
+        """Start a fresh request after the previous one completed successfully."""
+
+        if state.last_tool_result is None:
+            return
+        state.active_intent = "unknown"
+        state.pending_action = "clarify"
+        state.slots = {
+            key: value
+            for key, value in state.slots.items()
+            if key in {"order_id", "ticket_no"} and value is not None
+        }
+        state.missing_slots = []
+        state.awaiting_confirmation = False
+        state.summary = SessionManager._build_summary(state)
 
     @staticmethod
     def _validate_session_owner(

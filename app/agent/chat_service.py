@@ -74,6 +74,32 @@ class ChatService:
             inputs=self._dify_inputs(session_id),
         )
         raw_result = self._extract_result_json(dify_response)
+        if self._has_final_answer_contract(dify_response):
+            context = self.session_manager.get_effective_context(session_id)
+            final_answer = self._extract_final_answer(dify_response)
+            if context is not None:
+                tool_result = self._stored_tool_result(session_id)
+                answer = final_answer or self._answer({}, context, tool_result)
+                return ChatResult(
+                    answer=answer,
+                    intent_result=context.intent_result,
+                    context=context,
+                    tool_result=tool_result,
+                    conversation_id=dify_response.get("conversation_id"),
+                )
+            if final_answer:
+                return ChatResult(
+                    answer=final_answer,
+                    intent_result=parse_dify_output(raw_result),
+                    context=self.session_manager.process_turn(
+                        session_id=session_id,
+                        user_id=user_id,
+                        user_message=message,
+                        intent_result=parse_dify_output(raw_result),
+                        dify_conversation_id=dify_response.get("conversation_id"),
+                    ),
+                    conversation_id=dify_response.get("conversation_id"),
+                )
         intent_result = parse_dify_output(raw_result)
 
         return self._process_intent_result(
@@ -136,6 +162,7 @@ class ChatService:
                 context=context,
                 user_id=user_id,
             )
+            self.session_manager.record_tool_result(session_id, tool_result)
 
         answer = self._answer(answer_response or {}, context, tool_result)
         return ChatResult(
@@ -187,22 +214,53 @@ class ChatService:
         state = self.session_manager.get_state(session_id)
         return state.dify_conversation_id if state else None
 
+    def _stored_tool_result(
+        self,
+        session_id: str,
+    ) -> dict[str, Any] | None:
+        state = self.session_manager.get_state(session_id)
+        return state.last_tool_result if state else None
+
     def _dify_inputs(self, session_id: str) -> dict[str, Any]:
         state = self.session_manager.get_state(session_id)
         if state is None:
-            return {}
-        return {
-            "session_id": session_id,
-            "memory_summary": state.summary,
-            "slots": state.slots,
-            "recent_turns": [
+            state_summary = ""
+            state_slots: dict[str, str | None] = {}
+            recent_turns: list[dict[str, Any]] = []
+        else:
+            state_summary = state.summary
+            state_slots = state.slots
+            recent_turns = [
                 {
                     "turn_no": turn.turn_no,
                     "user_message": turn.user_message,
                     "intent": turn.intent_result.intent,
                 }
                 for turn in state.recent_turns
-            ],
+            ]
+        return {
+            "session_id": session_id,
+            "memory_summary": state_summary,
+            "history_summary": state_summary,
+            "slots": state_slots,
+            "current_slots": json.dumps(
+                state_slots,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+            "recent_turns": json.dumps(
+                recent_turns,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+            "intent_system_prompt": (
+                "理解阶段只负责当前轮意图和当前消息实体识别，"
+                "Python 负责跨轮合并、权限校验和工具门控。"
+            ),
+            "answer_system_prompt": (
+                "回答必须基于经过 Python 校验的有效上下文和工具结果，"
+                "只输出客户可见的自然语言。"
+            ),
         }
 
     @staticmethod
@@ -233,6 +291,47 @@ class ChatService:
                         return data["result_json"]
                     if "intent_result" in data:
                         return data["intent_result"]
+        return answer
+
+    @staticmethod
+    def _has_final_answer_contract(response: dict[str, Any]) -> bool:
+        """Identify the new answer-stage wrapper without treating legacy text as final."""
+
+        if "final_answer" in response:
+            return True
+        answer = response.get("answer")
+        if not isinstance(answer, str):
+            return False
+        try:
+            payload = json.loads(answer)
+        except (TypeError, ValueError):
+            return False
+        return isinstance(payload, dict) and "final_answer" in payload
+
+    @staticmethod
+    def _extract_final_answer(response: dict[str, Any]) -> str | None:
+        """Validate and unwrap the answer-stage customer text."""
+
+        candidate: Any = response.get("final_answer")
+        if candidate is None:
+            raw_answer = response.get("answer")
+            if isinstance(raw_answer, str):
+                try:
+                    payload = json.loads(raw_answer)
+                except (TypeError, ValueError):
+                    payload = None
+                if isinstance(payload, dict):
+                    candidate = payload.get("final_answer")
+        if not isinstance(candidate, str):
+            return None
+        answer = candidate.strip()
+        if (
+            not answer
+            or len(answer) > 4000
+            or _is_internal_summary(answer)
+            or _looks_like_internal_payload(answer)
+        ):
+            return None
         return answer
 
     @staticmethod
@@ -306,6 +405,17 @@ def _extract_customer_answer(raw_answer: Any) -> str | None:
 
 def _is_internal_summary(answer: str) -> bool:
     return answer.startswith("当前意图：") or answer.startswith("已填槽位：")
+
+
+def _looks_like_internal_payload(answer: str) -> bool:
+    markers = (
+        "intent_result",
+        "tool_result",
+        "effective_session_context",
+        "missing_slots",
+        "should_call_tool",
+    )
+    return any(marker in answer for marker in markers)
 
 
 def _format_missing_slots(context: EffectiveSessionContext) -> str:

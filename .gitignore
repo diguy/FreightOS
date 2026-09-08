@@ -4,3 +4,7 @@ __pycache__/
 .idea/
 .env
 app.log
+data/knowledge/corpus.jsonl
+data/knowledge/reports/
+vendor/ragflow/
+.env

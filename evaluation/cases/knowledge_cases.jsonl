@@ -1,0 +1,5 @@
+{"id":"sf-forbidden","question":"顺丰进出口件哪些物品不能寄？","required_terms":["武器","烟草","酒","进出口件"],"forbidden_terms":[],"expected_source_contains":"顺丰快递规则"}
+{"id":"alcohol","question":"酒能通过顺丰进出口件寄送吗？","required_terms":["酒","禁寄","限寄"],"forbidden_terms":["一定可以寄"],"expected_source_contains":"顺丰快递规则"}
+{"id":"tobacco","question":"烟草制品是否属于限制寄递物品？","required_terms":["烟草","烟草制品"],"forbidden_terms":["可以正常寄送"],"expected_source_contains":"顺丰快递规则"}
+{"id":"liquid-unknown","question":"液体能寄吗？","required_terms":["进出口件"],"forbidden_terms":["液体一定不能寄","液体一定可以寄"],"expected_source_contains":"顺丰快递规则"}
+{"id":"tracking-boundary","question":"ORD1001 到哪里了？","required_terms":[],"forbidden_terms":["禁寄","烟草","酒"],"expected_source_contains":""}

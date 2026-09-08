@@ -297,3 +297,76 @@ def test_complete_address_change_still_waits_when_dify_says_confirm():
     assert ready.awaiting_confirmation is True
     assert ready.effective_action == "confirm"
     assert ready.should_call_tool is False
+
+
+def test_successful_tool_turn_does_not_leak_completed_intent_to_next_unknown_turn():
+    manager = SessionManager(InMemorySessionStore())
+    first = manager.process_turn(
+        session_id="completed-address",
+        user_message="确认提交",
+        intent_result=_result(
+            "address_change",
+            entities=IntentEntities(
+                order_id="ORD1001",
+                new_address="上海市浦东新区世纪大道100号",
+            ),
+            action="confirm",
+        ),
+        user_id="user-1",
+    )
+    assert first.effective_intent == "address_change"
+
+    manager.record_tool_result(
+        "completed-address",
+        {"type": "address_change", "data": {"ticket_no": "T123"}},
+    )
+    next_turn = manager.process_turn(
+        session_id="completed-address",
+        user_message="帮我处理一下",
+        intent_result=_result(
+            "unknown",
+            confidence=0.0,
+            action="clarify",
+            should_call_tool=False,
+        ),
+        user_id="user-1",
+    )
+
+    assert next_turn.effective_intent == "unknown"
+    assert next_turn.effective_missing_slots == []
+    assert next_turn.awaiting_confirmation is False
+    assert next_turn.should_call_tool is False
+    assert next_turn.slots == {"order_id": "ORD1001"}
+    assert next_turn.context["summary"] == "当前没有待处理的业务请求。"
+
+
+def test_successful_tool_turn_keeps_safe_ticket_reference_for_next_request():
+    manager = SessionManager(InMemorySessionStore())
+    manager.process_turn(
+        session_id="completed-ticket",
+        user_message="查询 TABC12345",
+        intent_result=_result(
+            "ticket_status",
+            entities=IntentEntities(ticket_no="TABC12345"),
+        ),
+        user_id="user-1",
+    )
+    manager.record_tool_result(
+        "completed-ticket",
+        {"type": "ticket_status", "data": {"ticket_no": "TABC12345"}},
+    )
+
+    next_turn = manager.process_turn(
+        session_id="completed-ticket",
+        user_message="帮我处理一下",
+        intent_result=_result(
+            "unknown",
+            confidence=0.0,
+            action="clarify",
+            should_call_tool=False,
+        ),
+        user_id="user-1",
+    )
+
+    assert next_turn.effective_intent == "unknown"
+    assert next_turn.slots == {"ticket_no": "TABC12345"}
