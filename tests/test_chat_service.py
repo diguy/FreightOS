@@ -423,3 +423,57 @@ def test_knowledge_query_answer_has_explicit_no_result_fallback():
 
     assert "暂未检索到明确相关规则" in result.answer
     assert "自行补充结论" in result.answer
+
+
+def test_tracking_tool_result_is_formatted_for_customers():
+    answer = ChatService._answer(
+        {},
+        None,
+        {
+            "success": True,
+            "type": "tracking",
+            "data": {
+                "order_no": "ORD1001",
+                "carrier": "顺丰速运",
+                "tracking_no": "SF1001001",
+                "status": "in_transit",
+                "tracking_events": [
+                    {
+                        "event_time": "2026-08-29 12:10:00",
+                        "location": "上海浦东转运中心",
+                        "description": "包裹正在转运中",
+                    }
+                ],
+            },
+        },
+    )
+
+    assert answer == (
+        "已为您查到订单 ORD1001 的物流信息：\n"
+        "物流公司：顺丰速运\n"
+        "运单号：SF1001001\n"
+        "当前状态：运输中\n"
+        "最新进展：2026-08-29 12:10:00，上海浦东转运中心，包裹正在转运中"
+    )
+
+
+def test_ticket_status_tool_result_is_formatted_for_customers():
+    answer = ChatService._answer(
+        {},
+        None,
+        {
+            "success": True,
+            "type": "ticket_status",
+            "data": {
+                "ticket_no": "TABC12345",
+                "status": "processing",
+                "order_id": "ORD1001",
+            },
+        },
+    )
+
+    assert answer == (
+        "已为您查询工单 TABC12345：\n"
+        "当前状态：处理中\n"
+        "关联订单：ORD1001"
+    )

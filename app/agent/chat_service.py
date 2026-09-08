@@ -246,11 +246,23 @@ class ChatService:
                 return _format_knowledge_answer(tool_result)
             data = tool_result.get("data")
             if isinstance(data, dict):
-                return str(
-                    tool_result.get("message")
-                    or data.get("message")
-                    or data
-                )
+                message = tool_result.get("message") or data.get("message")
+                if isinstance(message, str) and message.strip():
+                    return message
+                if tool_result.get("type") == "tracking":
+                    return _format_tracking_answer(data)
+                if tool_result.get("type") == "ticket_status":
+                    return _format_ticket_status_answer(data)
+                if tool_result.get("type") in {
+                    "address_change",
+                    "complaint",
+                    "human_transfer",
+                }:
+                    return _format_ticket_created_answer(
+                        tool_result["type"],
+                        data,
+                    )
+                return "已完成处理，但暂时无法整理出详细结果。"
             return str(tool_result.get("message") or tool_result)
         if isinstance(response.get("answer"), str) and response["answer"].strip():
             return response["answer"]
@@ -262,6 +274,80 @@ class ChatService:
         if context.awaiting_confirmation:
             return "信息已完整，请确认是否提交。"
         return "我暂时无法处理这个请求，请稍后重试。"
+
+
+def _format_tracking_answer(data: dict[str, Any]) -> str:
+    """Convert an order tracking record into customer-facing Chinese."""
+
+    order_no = data.get("order_no", "当前订单")
+    carrier = data.get("carrier")
+    tracking_no = data.get("tracking_no")
+    status = {
+        "in_transit": "运输中",
+        "delivered": "已签收",
+        "exception": "物流异常",
+        "cancelled": "已取消",
+    }.get(data.get("status"), data.get("status") or "状态未知")
+    lines = [f"已为您查到订单 {order_no} 的物流信息："]
+    if carrier:
+        lines.append(f"物流公司：{carrier}")
+    if tracking_no:
+        lines.append(f"运单号：{tracking_no}")
+    lines.append(f"当前状态：{status}")
+
+    events = data.get("tracking_events")
+    if isinstance(events, list) and events and isinstance(events[0], dict):
+        latest = events[0]
+        event_time = latest.get("event_time", "")
+        location = latest.get("location", "")
+        description = latest.get("description", "")
+        lines.append(f"最新进展：{event_time}，{location}，{description}")
+    return "\n".join(lines)
+
+
+def _format_ticket_status_answer(data: dict[str, Any]) -> str:
+    """Convert a ticket record into a concise status response."""
+
+    status = {
+        "pending": "待处理",
+        "processing": "处理中",
+        "completed": "已完成",
+        "rejected": "已驳回",
+        "cancelled": "已取消",
+    }.get(data.get("status"), data.get("status") or "状态未知")
+    lines = [
+        f"已为您查询工单 {data.get('ticket_no', '')}：",
+        f"当前状态：{status}",
+    ]
+    if data.get("order_id"):
+        lines.append(f"关联订单：{data['order_id']}")
+    return "\n".join(lines)
+
+
+def _format_ticket_created_answer(
+    tool_type: str,
+    data: dict[str, Any],
+) -> str:
+    """Confirm creation of a change, complaint, or human-service ticket."""
+
+    title = {
+        "address_change": "地址修改",
+        "complaint": "投诉",
+        "human_transfer": "人工客服",
+    }.get(tool_type, "服务")
+    status = {
+        "pending": "待处理",
+        "processing": "处理中",
+        "completed": "已完成",
+    }.get(data.get("status"), data.get("status") or "待处理")
+    lines = [
+        f"已为您提交{title}工单。",
+        f"工单号：{data.get('ticket_no', '')}",
+        f"当前状态：{status}",
+    ]
+    if data.get("order_id"):
+        lines.append(f"关联订单：{data['order_id']}")
+    return "\n".join(lines)
 
 
 def _format_knowledge_answer(tool_result: dict[str, Any]) -> str:
