@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   AssistantRuntimeProvider,
@@ -13,27 +13,6 @@ import './App.css'
 
 const queryClient = new QueryClient()
 
-const demoAdapter: ChatModelAdapter = {
-  async run({ messages }) {
-    const lastMessage = messages.at(-1)
-    const textPart = lastMessage?.content.find((part) => part.type === 'text')
-    const query = textPart?.type === 'text' ? textPart.text : ''
-
-    await new Promise((resolve) => window.setTimeout(resolve, 650))
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: query.includes('ORD1001')
-            ? '我可以帮您查询订单 ORD1001 的物流进度。当前页面先使用演示数据，下一步会接入真实查询接口。'
-            : '收到。我会先理解您的物流需求，并在信息不足时向您询问必要内容。',
-        },
-      ],
-    }
-  },
-}
-
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -44,7 +23,57 @@ function App() {
 
 function CustomerWorkspace() {
   const [conversationKey, setConversationKey] = useState(0)
-  const runtime = useLocalRuntime(demoAdapter)
+  const [sessionId] = useState(() => crypto.randomUUID())
+  const difyConversationId = useRef<string | null>(null)
+  const apiAdapter = useMemo<ChatModelAdapter>(
+    () => ({
+      async run({ messages }) {
+        const lastMessage = messages.at(-1)
+        const textPart = lastMessage?.content.find((part) => part.type === 'text')
+        const query = textPart?.type === 'text' ? textPart.text : ''
+
+        try {
+          const response = await fetch('/api/v1/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-User-Id': 'demo-user-001',
+            },
+            body: JSON.stringify({
+              session_id: sessionId,
+              message: query,
+              dify_conversation_id: difyConversationId.current,
+            }),
+          })
+          const body = await response.json()
+          if (!response.ok || !body.success) {
+            throw new Error(body.error?.message || '客服暂时无法响应')
+          }
+
+          difyConversationId.current = body.data.conversation_id || null
+          return {
+            content: [
+              {
+                type: 'text',
+                text: body.data.answer || '我暂时没有找到可用的处理结果。',
+              },
+            ],
+          }
+        } catch {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: '抱歉，客服服务暂时不可用，请稍后再试。',
+              },
+            ],
+          }
+        }
+      },
+    }),
+    [sessionId],
+  )
+  const runtime = useLocalRuntime(apiAdapter)
   const shortcuts = useMemo(
     () => ['查一下 ORD1001 到哪里了', '我要修改收货地址', '查询工单状态'],
     [],
