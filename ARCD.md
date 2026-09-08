@@ -144,3 +144,23 @@ Dify HTTP 节点
 8. 业务行为变化必须补充或更新聚焦测试。
 9. 完成后先运行聚焦测试，再视影响范围运行全量测试。
 10. 提交后使用阶段步骤命名，例如 `1.1（项目上下文基线）`。
+
+## 5. 当前已验证的边界
+
+- Dify 的后端包装 `answer` 由 `ChatService` 解包后再交给 `IntentResult` 解析器。
+- `IntentResult` 只表示当前轮；跨轮槽位和确认状态保存在 SessionManager 管理的会话中。
+- 业务事实来自 MySQL Service/Repository，不来自 Dify 输出或 RAGFlow。
+- RAGFlow 只提供知识检索结果和来源，不提供订单、工单或用户权限事实。
+- RAGFlow 通过 FastAPI 中间层调用，不直接把 RAGFlow 知识库绑定到 Dify。
+- MCP Server 不接受调用方传入的 `user_id`，身份来自受控 Token 或本地配置。
+- MCP 当前暴露六个工具：订单查询、工单查询、知识检索、地址修改、投诉、人工转接。
+- 外部模型、RAGFlow、MySQL、Redis 的真实验证不能被 fake 测试结果替代。
+
+## 6. 当前运行配置
+
+- 业务 MySQL：`127.0.0.1:3308`。
+- 业务 Redis：`127.0.0.1:6380`。
+- FastAPI：`http://localhost:8000`。
+- Dify API：`http://localhost/v1`。
+- Dify Docker 回调：`http://host.docker.internal:8000/api/v1/agent/turn`。
+- RAGFlow Endpoint、API Key 和知识库 ID 只从本机 `.env` 读取，不能写入文档或回复。
