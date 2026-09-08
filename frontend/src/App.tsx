@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
@@ -13,13 +13,20 @@ import { ArrowUp, Box, Clock3, LifeBuoy, Plus, Send, ShieldCheck } from 'lucide-
 import './App.css'
 
 const queryClient = new QueryClient()
+const USER_STORAGE_KEY = 'logistics-customer-user'
+const SESSION_STORAGE_KEY = 'logistics-customer-sessions'
 
 function App() {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<User | null>(() => readStoredUser())
+
+  function handleLogin(nextUser: User) {
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(nextUser))
+    setUser(nextUser)
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
-      {user ? <CustomerWorkspace user={user} /> : <LoginView onLogin={setUser} />}
+      {user ? <CustomerWorkspace user={user} /> : <LoginView onLogin={handleLogin} />}
     </QueryClientProvider>
   )
 }
@@ -28,6 +35,55 @@ type User = {
   user_id: string
   name: string
   phone_masked: string
+}
+
+type SavedMessage = {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+type SavedSession = {
+  sessionId: string
+  difyConversationId: string | null
+  title: string
+  updatedAt: string
+  messages: SavedMessage[]
+}
+
+function readStoredUser(): User | null {
+  try {
+    const value = localStorage.getItem(USER_STORAGE_KEY)
+    return value ? JSON.parse(value) as User : null
+  } catch {
+    return null
+  }
+}
+
+function readStoredSessions(): SavedSession[] {
+  try {
+    const value = localStorage.getItem(SESSION_STORAGE_KEY)
+    const sessions = value ? JSON.parse(value) as SavedSession[] : []
+    return Array.isArray(sessions) ? sessions : []
+  } catch {
+    return []
+  }
+}
+
+function writeStoredSessions(sessions: SavedSession[]) {
+  localStorage.setItem(
+    SESSION_STORAGE_KEY,
+    JSON.stringify(sessions.slice(0, 8)),
+  )
+}
+
+function createSession(): SavedSession {
+  return {
+    sessionId: crypto.randomUUID(),
+    difyConversationId: null,
+    title: '新会话',
+    updatedAt: new Date().toISOString(),
+    messages: [],
+  }
 }
 
 function LoginView({ onLogin }: { onLogin: (user: User) => void }) {
@@ -93,8 +149,14 @@ function LoginView({ onLogin }: { onLogin: (user: User) => void }) {
 
 function CustomerWorkspace({ user }: { user: User }) {
   const [conversationKey, setConversationKey] = useState(0)
-  const [sessionId] = useState(() => crypto.randomUUID())
-  const difyConversationId = useRef<string | null>(null)
+  const [session, setSession] = useState<SavedSession>(
+    () => readStoredSessions()[0] || createSession(),
+  )
+  const [recentSessions, setRecentSessions] = useState<SavedSession[]>(
+    () => readStoredSessions(),
+  )
+  const sessionRef = useRef(session)
+  const difyConversationId = useRef<string | null>(session.difyConversationId)
   const apiAdapter = useMemo<ChatModelAdapter>(
     () => ({
       async run({ messages }) {
@@ -110,7 +172,7 @@ function CustomerWorkspace({ user }: { user: User }) {
               'X-User-Id': user.user_id,
             },
             body: JSON.stringify({
-              session_id: sessionId,
+              session_id: sessionRef.current.sessionId,
               message: query,
               dify_conversation_id: difyConversationId.current,
             }),
@@ -121,6 +183,33 @@ function CustomerWorkspace({ user }: { user: User }) {
           }
 
           difyConversationId.current = body.data.conversation_id || null
+          const currentSession = sessionRef.current
+          const updatedSession: SavedSession = {
+            ...currentSession,
+            difyConversationId: difyConversationId.current,
+            title: currentSession.messages.length
+              ? currentSession.title
+              : query.slice(0, 24) || '新会话',
+            updatedAt: new Date().toISOString(),
+            messages: [
+              ...currentSession.messages,
+              { role: 'user', content: query },
+              {
+                role: 'assistant',
+                content: body.data.answer || '我暂时没有找到可用的处理结果。',
+              },
+            ],
+          }
+          sessionRef.current = updatedSession
+          setSession(updatedSession)
+          const nextSessions = [
+            updatedSession,
+            ...readStoredSessions().filter(
+              (item) => item.sessionId !== updatedSession.sessionId,
+            ),
+          ]
+          writeStoredSessions(nextSessions)
+          setRecentSessions(nextSessions)
           return {
             content: [
               {
@@ -141,13 +230,34 @@ function CustomerWorkspace({ user }: { user: User }) {
         }
       },
     }),
-    [sessionId, user.user_id],
+    [user.user_id],
   )
-  const runtime = useLocalRuntime(apiAdapter)
+  const runtime = useLocalRuntime(apiAdapter, {
+    initialMessages: session.messages,
+  })
+  useEffect(() => {
+    runtime.thread.reset(session.messages)
+  }, [runtime, session.sessionId])
   const shortcuts = useMemo(
     () => ['查一下 ORD1001 到哪里了', '我要修改收货地址', '查询工单状态'],
     [],
   )
+
+  function startNewChat() {
+    const nextSession = createSession()
+    sessionRef.current = nextSession
+    difyConversationId.current = null
+    setSession(nextSession)
+    setRecentSessions((sessions) => [nextSession, ...sessions])
+    setConversationKey((key) => key + 1)
+  }
+
+  function openRecentSession(nextSession: SavedSession) {
+    sessionRef.current = nextSession
+    difyConversationId.current = nextSession.difyConversationId
+    setSession(nextSession)
+    setConversationKey((key) => key + 1)
+  }
 
   return (
     <AssistantRuntimeProvider key={conversationKey} runtime={runtime}>
@@ -171,7 +281,7 @@ function CustomerWorkspace({ user }: { user: User }) {
             <button
               className="new-chat-button"
               type="button"
-              onClick={() => setConversationKey((key) => key + 1)}
+              onClick={startNewChat}
             >
               <Plus size={17} /> 新建会话
             </button>
@@ -180,6 +290,21 @@ function CustomerWorkspace({ user }: { user: User }) {
               <a className="nav-item" href="#orders"><Box size={17} />我的订单</a>
               <a className="nav-item" href="#tickets"><Clock3 size={17} />我的工单</a>
             </nav>
+            {recentSessions.length > 0 && (
+              <div className="recent-sessions">
+                <p className="eyebrow">最近会话</p>
+                {recentSessions.slice(0, 5).map((item) => (
+                  <button
+                    className={`recent-session ${item.sessionId === session.sessionId ? 'active' : ''}`}
+                    key={item.sessionId}
+                    type="button"
+                    onClick={() => openRecentSession(item)}
+                  >
+                    {item.title}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="sidebar-footer">
               <div className="secure-note"><ShieldCheck size={16} /><span>您的订单信息已受保护</span></div>
               <div className="user-card">

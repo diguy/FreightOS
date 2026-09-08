@@ -226,6 +226,36 @@
   margin-top: 28px;
 }
 
+.recent-sessions {
+  display: grid;
+  gap: 4px;
+  margin-top: 24px;
+}
+
+.recent-sessions .eyebrow {
+  padding: 0 12px;
+}
+
+.recent-session {
+  overflow: hidden;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 6px;
+  color: #6b7e96;
+  background: transparent;
+  font-size: 11px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-session:hover,
+.recent-session.active {
+  color: #1769e0;
+  background: #edf4ff;
+}
+
 .nav-item {
   gap: 11px;
   height: 40px;
