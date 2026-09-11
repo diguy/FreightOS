@@ -10,7 +10,8 @@ import pytest
 
 DSL_PATH = (
     Path(__file__).resolve().parents[1]
-    / "deliverables"
+    / "docs"
+    / "artifacts"
     / "物流意图识别-v3-多轮端到端验证-意图评测修正版.yml"
 )
 DSL_V2_PATH = DSL_PATH.with_name(

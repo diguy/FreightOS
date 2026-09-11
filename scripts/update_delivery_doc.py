@@ -12,7 +12,7 @@ from docx.shared import Pt
 
 SOURCE = Path(r"F:\agent学习路径\物流知识库\电商物流智能客服_项目进度与后续交付计划.docx")
 OUTPUT = Path(
-    "deliverables/电商物流智能客服_项目进度与后续交付计划_验收交接版_2026-09-07.docx"
+    "docs/artifacts/电商物流智能客服_项目进度与后续交付计划_验收交接版_2026-09-07.docx"
 )
 
 
@@ -87,7 +87,7 @@ def main() -> None:
         [
             ["单元与模块测试", "poetry run pytest tests -q", "161 passed，1 个 Starlette/httpx 弃用警告"],
             ["重点回归", "MySQL、订单、知识库、ChatService 相关测试", "32 passed"],
-            ["知识库评测", "poetry run python evaluation/evaluate_knowledge.py", "5/5 passed，使用 RAGFlow"],
+            ["知识库评测", "poetry run python scripts/evaluation/evaluate_knowledge.py", "5/5 passed，使用 RAGFlow"],
             ["真实 Dify 链路", "scripts/test_live_dify_chain.py", "通过，ORD1001 只读查询成功"],
             ["真实依赖检查", "GET /health/dependencies", "MySQL ok，Redis ok"],
             ["知识库 HTTP 接口", "POST /api/v1/knowledge/query", "200，返回 records 和 context"],
@@ -130,7 +130,7 @@ def main() -> None:
 
     add_heading(document, "六 尚未作为完整模型指标交付的部分", 1)
     document.add_paragraph(
-        "当前 evaluation/results 中的历史 Dify 输出文件只覆盖部分用例。用 "
+        "当前 scripts/evaluation/results 中的历史 Dify 输出文件只覆盖部分用例。用 "
         "formal-20-dify_outputs-2026-09-06.jsonl 运行全量评测时，基础集 35 条中有 "
         "23 条缺少预测，对抗集 15 条中有 7 条缺少预测。因此该统计只能作为历史部分样本，"
         "不能当作完整意图准确率。工具安全门控没有发现不安全调用。下一窗口应先补齐 50 条用例的"
@@ -152,7 +152,7 @@ def main() -> None:
     add_heading(document, "八 可复用验收命令", 1)
     commands = [
         "poetry run pytest tests -q",
-        "poetry run python evaluation/evaluate_knowledge.py",
+        "poetry run python scripts/evaluation/evaluate_knowledge.py",
         "poetry run python scripts/test_live_dify_chain.py --session-id acceptance-live-20260907",
         "$env:MYSQL_BACKUP_CONTAINER='logistics-mysql'; poetry run python scripts/backup_mysql.py",
     ]

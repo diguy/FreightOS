@@ -16,7 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.agent.dify_client import DifyClientError, DifySettings, HttpDifyClient
 from app.mysql_database import get_mysql_connection
-from evaluation.evaluate_intents import build_report
+from scripts.evaluation.evaluate_intents import build_report
 
 
 def _read_cases(path: Path) -> list[dict[str, object]]:
@@ -214,8 +214,8 @@ def run_regression(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cases-dir", type=Path, default=Path("evaluation/cases"))
-    parser.add_argument("--output-dir", type=Path, default=Path("evaluation/results"))
+    parser.add_argument("--cases-dir", type=Path, default=Path("scripts/evaluation/cases"))
+    parser.add_argument("--output-dir", type=Path, default=Path("scripts/evaluation/results"))
     parser.add_argument("--user", default="formal-intent-regression-20260907")
     parser.add_argument("--delay-seconds", type=float, default=0.0)
     args = parser.parse_args(argv)

@@ -2,10 +2,10 @@
 
 本文档是本项目的全局协作规范。新窗口开始工作时，应同时阅读：
 
-1. `prd.md`：产品目标和需求范围。
-2. `ARCD.md`：系统架构和模块边界。
-3. `project.md`：当前阶段、验证事实、难点和下一步。
-4. `WORKFLOW.md`：本文件，规定每次工作的执行方式。
+1. `docs/project/prd.md`：产品目标和需求范围。
+2. `docs/project/ARCD.md`：系统架构和模块边界。
+3. `docs/project/project.md`：当前阶段、验证事实、难点和下一步。
+4. `docs/project/WORKFLOW.md`：本文件，规定每次工作的执行方式。
 
 ## 1. 小切片原则
 

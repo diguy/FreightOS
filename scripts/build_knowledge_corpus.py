@@ -14,7 +14,11 @@ from app.rag.etl import build_corpus, write_jsonl
 def main() -> None:
     parser = ArgumentParser(description="Extract and chunk local logistics documents.")
     parser.add_argument("--input", type=Path, required=True)
-    parser.add_argument("--output", type=Path, default=Path("data/knowledge/corpus.jsonl"))
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("app/data/knowledge/corpus.jsonl"),
+    )
     parser.add_argument("--query-date", default=date.today().isoformat())
     parser.add_argument("--max-chars", type=int, default=1200)
     parser.add_argument("--overlap", type=int, default=120)

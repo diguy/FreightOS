@@ -12,16 +12,16 @@ htmlcov/
 pytest-cache-files-*/
 
 # Local databases, exports, and backups
-data/*.db
-data/*.sqlite
-data/*.sqlite3
-data/backups/
+app/data/*.db
+app/data/*.sqlite
+app/data/*.sqlite3
+app/data/backups/
 *.sql
 
 # Generated knowledge and evaluation output
-data/knowledge/corpus.jsonl
-data/knowledge/reports/
-evaluation/results/
+app/data/knowledge/corpus.jsonl
+app/data/knowledge/reports/
+scripts/evaluation/results/
 
 # Local runtime, QA, and temporary files
 tmp_*/

@@ -1,6 +1,6 @@
 import json
 
-from evaluation.evaluate_intents import build_report, evaluate_cases, main
+from scripts.evaluation.evaluate_intents import build_report, evaluate_cases, main
 
 
 def _result(
@@ -190,7 +190,7 @@ def test_cli_writes_regression_report(tmp_path, capsys):
             "--predictions",
             str(prediction_file),
             "--cases-dir",
-            "evaluation/cases",
+            "scripts/evaluation/cases",
             "--output",
             str(report_file),
         ]

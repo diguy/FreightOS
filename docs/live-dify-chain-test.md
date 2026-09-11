@@ -10,7 +10,7 @@ DIFY_API_KEY=你的应用API密钥
 DIFY_TIMEOUT_SECONDS=30
 ```
 
-应用应导入 `deliverables/物流意图识别-v3-契约修正版.yml`，并确保它返回
+应用应导入 `docs/artifacts/物流意图识别-v3-契约修正版.yml`，并确保它返回
 `result_json` 结构化意图 JSON。
 
 ## 2. 执行

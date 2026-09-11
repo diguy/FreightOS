@@ -89,7 +89,12 @@ class LocalKnowledgeClient:
 
     @staticmethod
     def _default_corpus_path() -> Path:
-        return Path(__file__).resolve().parents[2] / "data" / "knowledge" / "corpus.jsonl"
+        return (
+            Path(__file__).resolve().parents[1]
+            / "data"
+            / "knowledge"
+            / "corpus.jsonl"
+        )
 
     @staticmethod
     def _score(query_tokens: set[str], text: str) -> float:

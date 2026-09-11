@@ -292,7 +292,7 @@ def create_intent_doc() -> Path:
             ["app/agent/intent_rules.py", "确定性实体提取", "正则提取订单号、工单号、手机号和确认词"],
             ["app/agent/intent_extractor.py", "组合规则提取器", "输出统一 RuleExtractionResult"],
             ["docs/intent-contract.md", "跨模块契约", "字段、规则、验收标准和边界"],
-            ["evaluation/cases/*.jsonl", "离线评测集", "基础样例和对抗样例"],
+            ["scripts/evaluation/cases/*.jsonl", "离线评测集", "基础样例和对抗样例"],
         ],
         widths=[5.2, 5.0, 5.3],
     )
@@ -397,7 +397,7 @@ def create_handoff_doc() -> Path:
             ["app/agent/intent_rules.py", "规则实体提取", "已完成"],
             ["app/agent/intent_extractor.py", "规则提取组合器", "已完成"],
             ["docs/intent-contract.md", "意图识别契约", "已完成"],
-            ["evaluation/cases/", "离线测试集", "已包含基础和对抗样例"],
+            ["scripts/evaluation/cases/", "离线测试集", "已包含基础和对抗样例"],
             ["tests/", "Python 自动化测试", "已有较多后端与意图测试"],
             ["F:/agent学习路径/物流知识库/物流意图识别-v2-纯字符串输出.yml", "Dify 意图识别 DSL", "可作为当前导入版本"],
             ["F:/agent学习路径/物流知识库/物流查询测试.yml", "原有物流查询 DSL", "不要误当成最新意图 DSL"],
@@ -414,8 +414,8 @@ def create_handoff_doc() -> Path:
             ["数据模型", "Pydantic 校验、枚举限制、低置信度安全降级", "app/agent/intent_schema.py"],
             ["规则提取", "订单号、工单号、手机号、确认和取消表达", "app/agent/intent_rules.py"],
             ["模块组合", "统一输出 RuleExtractionResult", "app/agent/intent_extractor.py"],
-            ["基础用例", "7 类意图各 5 条，共 35 条", "evaluation/cases/intent_cases.jsonl"],
-            ["对抗用例", "混合意图、模糊动作、历史实体等 15 条", "evaluation/cases/intent_adversarial_cases.jsonl"],
+            ["基础用例", "7 类意图各 5 条，共 35 条", "scripts/evaluation/cases/intent_cases.jsonl"],
+            ["对抗用例", "混合意图、模糊动作、历史实体等 15 条", "scripts/evaluation/cases/intent_adversarial_cases.jsonl"],
             ["Dify DSL", "修复 Code 节点结构化 outputs 兼容错误", "v2 纯字符串输出 DSL"],
             ["人工测评", "用户测试准确率达到约 90%", "用户当前反馈"],
         ],
@@ -467,7 +467,7 @@ def create_handoff_doc() -> Path:
     add_bullet(doc, "新增针对正常、空值、脏 JSON 和安全降级的单元测试。")
 
     doc.add_heading("步骤 3 批量测评", level=2)
-    add_bullet(doc, "读取 evaluation/cases/ 下的 JSONL 文件。")
+    add_bullet(doc, "读取 scripts/evaluation/cases/ 下的 JSONL 文件。")
     add_bullet(doc, "统计 intent accuracy、entity accuracy、missing_slots accuracy、tool_gate accuracy。")
     add_bullet(doc, "将基础样例和对抗样例分开统计，不只报告一个平均分。")
     add_bullet(doc, "每次 Dify Prompt 或规则修改后，保留测评结果，形成可比较的回归记录。")

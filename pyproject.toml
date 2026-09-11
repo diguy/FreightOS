@@ -28,3 +28,9 @@ dev = [
     "pytest (>=9.1.1,<10.0.0)",
     "httpx (>=0.28.1,<0.29.0)"
 ]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: crosses process or external service boundaries",
+]
+pythonpath = ["."]

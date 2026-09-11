@@ -12,7 +12,7 @@ orders or tickets.
 Copy `.env.example` to `.env`, review passwords, then run:
 
 ```powershell
-docker compose -f docker-compose.ragflow-deps.yml up -d
+docker compose -f docs/ops/docker-compose.ragflow-deps.yml up -d
 ```
 
 The compose file is a dependency template. The exact RAGFlow version and its
@@ -21,13 +21,13 @@ RAGFlow server.
 
 ## 2. Prepare documents
 
-Place source files under a local directory, for example `data/knowledge/source`.
+Place source files under `app/data/knowledge/source`.
 The ETL currently supports text PDF, DOCX, TXT and Markdown files.
 
 ```powershell
 poetry run python scripts/build_knowledge_corpus.py `
-  --input data/knowledge/source `
-  --output data/knowledge/corpus.jsonl `
+  --input app/data/knowledge/source `
+  --output app/data/knowledge/corpus.jsonl `
   --query-date 2026-09-04
 ```
 

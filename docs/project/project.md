@@ -1,6 +1,6 @@
 # 当前项目阶段
 
-> 新窗口必须先阅读 `AGENTS.md`、`WORKFLOW.md`、`prd.md`、`ARCD.md` 和本文件。
+> 新窗口必须先阅读 `AGENTS.md`、`docs/project/WORKFLOW.md`、`docs/project/prd.md`、`docs/project/ARCD.md` 和本文件。
 
 ## 0. 当前产品化阶段
 
@@ -148,7 +148,7 @@ poetry run python scripts/test_live_dify_chain.py --message "查一下 ORD1001 �
 执行：
 
 ```powershell
-poetry run python evaluation/evaluate_knowledge.py
+poetry run python scripts/evaluation/evaluate_knowledge.py
 ```
 
 结果：

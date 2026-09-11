@@ -1,6 +1,6 @@
 # 电商物流智能客服架构说明
 
-> 项目全局工作规范见 `WORKFLOW.md`。新窗口必须与本文件、`prd.md`、`project.md` 一起阅读。
+> 项目全局工作规范见 `docs/project/WORKFLOW.md`。新窗口必须与本文件、`prd.md`、`project.md` 一起阅读。
 
 ## 0. 2026年9月8日产品化架构结论
 

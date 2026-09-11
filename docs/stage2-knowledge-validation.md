@@ -5,7 +5,7 @@
 当前只使用一份物流规则文档：
 
 ```text
-data/knowledge/source/顺丰快递规则——进出口件禁止 限制寄递物品.md
+app/data/knowledge/source/顺丰快递规则——进出口件禁止 限制寄递物品.md
 ```
 
 `物流查询测试.yml` 是 Dify Chatflow 配置，不是知识库文档。
@@ -16,8 +16,8 @@ data/knowledge/source/顺丰快递规则——进出口件禁止 限制寄递物
 
 ```powershell
 poetry run python scripts/build_knowledge_corpus.py `
-  --input data/knowledge/source `
-  --output data/knowledge/corpus.jsonl `
+  --input app/data/knowledge/source `
+  --output app/data/knowledge/corpus.jsonl `
   --query-date 2026-09-04
 ```
 
@@ -27,7 +27,7 @@ poetry run python scripts/build_knowledge_corpus.py `
 wrote 1 chunks
 ```
 
-在导入前检查 `data/knowledge/corpus.jsonl`，确认只包含物流规则、
+在导入前检查 `app/data/knowledge/corpus.jsonl`，确认只包含物流规则、
 来源文件名和元数据，不包含订单、轨迹、手机号或地址。
 
 ## 2. 在 RAGFlow 页面验证

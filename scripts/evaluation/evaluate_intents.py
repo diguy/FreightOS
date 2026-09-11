@@ -10,8 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-# Keep direct execution (`python evaluation/evaluate_intents.py`) working.
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# Keep direct execution (`python scripts/evaluation/evaluate_intents.py`) working.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -221,7 +221,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--cases-dir",
         type=Path,
-        default=Path("evaluation/cases"),
+        default=Path("scripts/evaluation/cases"),
         help="Directory containing intent_cases.jsonl and intent_adversarial_cases.jsonl",
     )
     parser.add_argument(

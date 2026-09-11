@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from evaluation.evaluate_knowledge import evaluate_case
+from scripts.evaluation.evaluate_knowledge import evaluate_case
 from app.rag.local_client import LocalKnowledgeClient
 from app.rag.retriever import KnowledgeRetriever
 

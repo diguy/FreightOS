@@ -22,7 +22,7 @@ poetry run python scripts\migrate_sqlite_to_mysql.py
 ## 备份
 
 ```powershell
-$env:MYSQL_BACKUP_DIR="data/backups"
+$env:MYSQL_BACKUP_DIR="app/data/backups"
 poetry run python scripts\backup_mysql.py
 ```
 
