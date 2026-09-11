@@ -157,6 +157,93 @@ def test_invalid_final_answer_uses_safe_tool_fallback():
     assert "tool_result" not in result.answer
 
 
+def test_final_answer_with_think_trace_keeps_customer_text_only():
+    dify = FakeDifyClient(
+        [
+            {
+                "answer": __import__("json").dumps(
+                    {
+                        "final_answer": (
+                            "<think>internal reasoning</think>"
+                            "订单目前正在运输中。"
+                        )
+                    },
+                    ensure_ascii=False,
+                ),
+                "conversation_id": "conv-think-final-answer",
+            }
+        ]
+    )
+    session_manager = SessionManager(InMemorySessionStore())
+    session_manager.process_turn(
+        session_id="session-think-final-answer",
+        user_id="user-think-final-answer",
+        user_message="查一下 ORD1001 到哪里了",
+        intent_result=IntentResult.model_validate(_payload()),
+    )
+    session_manager.record_tool_result(
+        "session-think-final-answer",
+        {
+            "type": "tracking",
+            "data": {
+                "order_no": "ORD1001",
+                "status": "in_transit",
+            },
+        },
+    )
+    service = ChatService(
+        dify_client=dify,
+        session_manager=session_manager,
+        tool_executor=RecordingToolExecutor(),
+    )
+
+    result = service.handle_message(
+        session_id="session-think-final-answer",
+        user_id="user-think-final-answer",
+        message="查一下 ORD1001 到哪里了",
+    )
+
+    assert "<think>" not in result.answer
+    assert "internal reasoning" not in result.answer
+    assert result.answer == "订单目前正在运输中。"
+
+
+def test_legacy_answer_with_think_trace_keeps_customer_text_only():
+    payload = _payload(
+        intent="address_change",
+        order_id=None,
+        action="collect_info",
+    )
+    payload["missing_slots"] = ["order_id", "new_address"]
+    payload["should_call_tool"] = False
+    dify = FakeDifyClient(
+        [
+            {
+                "answer": (
+                    "<think>internal reasoning</think>"
+                    "请提供订单号和新的收货地址。"
+                ),
+                "conversation_id": "conv-think-legacy-answer",
+                "result_json": __import__("json").dumps(payload),
+            }
+        ]
+    )
+    service = ChatService(
+        dify_client=dify,
+        session_manager=SessionManager(InMemorySessionStore()),
+        tool_executor=RecordingToolExecutor(),
+    )
+
+    result = service.handle_message(
+        session_id="session-think-legacy-answer",
+        user_id="user-think-legacy-answer",
+        message="我要修改收货地址",
+    )
+
+    assert result.answer == "请提供订单号和新的收货地址。"
+    assert "<think>" not in result.answer
+
+
 def test_unknown_follow_up_after_completed_address_change_does_not_reuse_old_request():
     first = _payload(
         intent="address_change",

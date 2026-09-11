@@ -4,7 +4,43 @@ __pycache__/
 .idea/
 .env
 app.log
+
+# Python test and coverage output
+.pytest_cache/
+.coverage
+htmlcov/
+pytest-cache-files-*/
+
+# Local databases, exports, and backups
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+data/backups/
+*.sql
+
+# Generated knowledge and evaluation output
 data/knowledge/corpus.jsonl
 data/knowledge/reports/
+evaluation/results/
+
+# Local runtime, QA, and temporary files
+tmp_*/
+tmp_render/
+qa_*/
+flow_media/
+.agents/
+.npm-cache/
+*.log
+tmp_inspect_*.py
+tmp_plan_text.txt
+tmp_read_docs.py
+tstest_*.py
+aibang_text.txt
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+
+# Local editor and tool state
+.vscode/
 vendor/ragflow/
-.env

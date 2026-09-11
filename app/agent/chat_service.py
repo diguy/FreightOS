@@ -280,6 +280,7 @@ class ChatService:
 
         answer = response.get("answer")
         if isinstance(answer, str):
+            answer = _remove_reasoning_trace(answer)
             try:
                 answer_payload = json.loads(answer)
             except (TypeError, ValueError):
@@ -302,6 +303,7 @@ class ChatService:
         answer = response.get("answer")
         if not isinstance(answer, str):
             return False
+        answer = _remove_reasoning_trace(answer)
         try:
             payload = json.loads(answer)
         except (TypeError, ValueError):
@@ -316,6 +318,7 @@ class ChatService:
         if candidate is None:
             raw_answer = response.get("answer")
             if isinstance(raw_answer, str):
+                raw_answer = _remove_reasoning_trace(raw_answer)
                 try:
                     payload = json.loads(raw_answer)
                 except (TypeError, ValueError):
@@ -324,7 +327,7 @@ class ChatService:
                     candidate = payload.get("final_answer")
         if not isinstance(candidate, str):
             return None
-        answer = candidate.strip()
+        answer = _remove_reasoning_trace(candidate)
         if (
             not answer
             or len(answer) > 4000
@@ -400,7 +403,10 @@ def _extract_customer_answer(raw_answer: Any) -> str | None:
             candidate = payload["answer"].strip()
             continue
         break
-    return candidate or None
+    candidate = _remove_reasoning_trace(candidate)
+    if not candidate:
+        return None
+    return candidate
 
 
 def _is_internal_summary(answer: str) -> bool:
@@ -416,6 +422,22 @@ def _looks_like_internal_payload(answer: str) -> bool:
         "should_call_tool",
     )
     return any(marker in answer for marker in markers)
+
+
+def _remove_reasoning_trace(answer: str) -> str:
+    """Remove closed model reasoning blocks while preserving customer text."""
+
+    import re
+
+    cleaned = re.sub(
+        r"<think>.*?</think>",
+        "",
+        answer,
+        flags=re.IGNORECASE | re.DOTALL,
+    ).strip()
+    if "<think" in cleaned.lower() or "</think>" in cleaned.lower():
+        return ""
+    return cleaned
 
 
 def _format_missing_slots(context: EffectiveSessionContext) -> str:
